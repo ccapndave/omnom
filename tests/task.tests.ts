@@ -1,6 +1,7 @@
-import { task, run, series, parallel, src, dest, Task, RunnableTask } from "../src/index";
+import { task, run, series, parallel, src, rename, mapJson, dest, Task, RunnableTask } from "../src/index";
 import { assert } from "chai";
 import { dir } from "tmp";
+import { resolve } from "path";
 import * as fs from "fs";
 
 /**
@@ -29,6 +30,7 @@ async function assertTaskConcurrency(count: number, seriesCount: number, taskBui
 
 const tmpDir = () => new Promise<string>((resolve, reject) => dir((err, path) => (err ? reject(err) : resolve(path))));
 const readDir = (path: string) => new Promise<string[]>((resolve, reject) => fs.readdir(path, (err, files) => (err) ? reject(err) : resolve(files)));
+const readFile = (path: string) => new Promise<string | Buffer>((resolve, reject) => fs.readFile(path, (err, data) => (err) ? reject(err) : resolve(data)));
 
 describe("Concurrency combinator", () => {
   describe("series", () => {
@@ -111,7 +113,7 @@ describe("File functions", () => {
     await run("copy");
 
     const files = await readDir(outDir);
-    assert.lengthOf(files, 4, `There should have been 4 files copied.`);
+    assert.lengthOf(files, 5, `There should have been 5 files copied.`);
   });
 
   it("should copy files of a type from src to dest", async () => {
@@ -127,11 +129,49 @@ describe("File functions", () => {
   it("should allow an array of globs", async () => {
     const outDir = await tmpDir();
 
-    task("copy", async () => src("tests/assets", [ "1.svg", "4.mp3" ], { root: "tests/assets" }).then(dest(outDir)));
+    task("copy", async () => src("tests/assets", [ "1.svg", "4.mp3" ]).then(dest(outDir)));
     await run("copy");
 
     const files = await readDir(outDir);
     assert.lengthOf(files, 2, `There should have been 2 files copied.`);
+  });
+
+  it("should allow file renaming", async () => {
+    const outDir = await tmpDir();
+
+    task("rename", async () =>
+      src("tests/assets", "1.svg")
+        .then(files => files.map(rename("renamed.svg")))
+        .then(dest(outDir))
+    );
+
+    await run("rename");
+
+    const files = await readDir(outDir);
+
+    assert.lengthOf(files, 1);
+    assert.equal(files[0], "renamed.svg");
+  });
+
+  it("should manipulate json", async () => {
+    const outDir = await tmpDir();
+
+    task("rename", async () =>
+      src("tests/assets", "5.json")
+        .then(files => files.map(mapJson(json => ({ "changed": true }))))
+        .then(dest(outDir))
+    );
+
+    await run("rename");
+
+    const files = await readDir(outDir);
+
+    assert.lengthOf(files, 1);
+    assert.equal(files[0], "5.json");
+
+    const loadedJson = await readFile(resolve(outDir, "5.json"));
+    const parsedJson = JSON.parse(loadedJson.toString());
+    assert.equal(parsedJson.changed, true);
   });
 
 });

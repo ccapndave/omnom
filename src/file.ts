@@ -9,11 +9,21 @@ interface File {
 }
 
 function mkFile(path: string, buffer: Buffer): File {
-  return { path, buffer };
+  return { path: normalize(path), buffer };
 }
 
-export function rename(name: string): (file: File) => File {
-  return file => ({ ...file, name });
+export function rename(path: string): (file: File) => File {
+  return file => ({ ...file, path });
+}
+
+export function mapJson(transform: (json: any) => any): (file: File) => File {
+  return file => {
+    const json = JSON.parse(file.buffer.toString());
+    const transformedJson = transform(json);
+    const buffer = Buffer.from(JSON.stringify(transformedJson), "utf8");
+
+    return ({ ...file, buffer });
+  }
 }
 
 export async function src(cwd: string, patterns: string | string[], opts: IOptions = {}): Promise<File[]> {
