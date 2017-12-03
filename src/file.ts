@@ -1,24 +1,22 @@
 import { IOptions } from "glob"
 import * as globby from "globby"
 import * as fs from "fs"
-import { resolve, normalize, relative, basename } from "path"
+import { resolve, normalize, relative, dirname, basename } from "path"
 
 class File {
 
-  readonly cwd: string;
   readonly path: string;
   readonly name: string;
 
-  constructor(cwd: string, path: string, readonly buffer: Buffer) {
-    this.cwd = normalize(cwd);
+  constructor(path: string, readonly buffer: Buffer) {
     this.path = normalize(path);
     this.name = basename(this.path);
   }
 
-  /* rename(name: string) {
-    this.name = name;
-    return this;
-  } */
+  rename(name: string) {
+    const newName = resolve(dirname(this.path), name);
+    return new File(newName, this.buffer);
+  }
 
 }
 
@@ -26,7 +24,7 @@ export async function src(cwd: string, patterns: string | string[], opts: IOptio
   const paths = await globby(patterns, { ...opts, cwd });
   return Promise.all(
     paths.map(path =>
-      readFile(resolve(cwd, path)).then(buffer => new File(cwd, path, buffer))
+      readFile(resolve(cwd, path)).then(buffer => new File(path, buffer))
     )
   );
 }

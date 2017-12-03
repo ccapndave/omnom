@@ -133,4 +133,5 @@ describe("File functions", () => {
     const files = await readDir(outDir);
     assert.lengthOf(files, 2, `There should have been 2 files copied.`);
   });
+
 });
