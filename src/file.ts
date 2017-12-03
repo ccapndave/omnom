@@ -3,36 +3,34 @@ import * as globby from "globby"
 import * as fs from "fs"
 import { resolve, normalize, relative, dirname, basename } from "path"
 
-class File {
-
+interface File {
   readonly path: string;
-  readonly name: string;
+  readonly buffer: Buffer;
+}
 
-  constructor(path: string, readonly buffer: Buffer) {
-    this.path = normalize(path);
-    this.name = basename(this.path);
-  }
+function mkFile(path: string, buffer: Buffer): File {
+  return { path, buffer };
+}
 
-  rename(name: string) {
-    const newName = resolve(dirname(this.path), name);
-    return new File(newName, this.buffer);
-  }
-
+export function rename(name: string): (file: File) => File {
+  return file => ({ ...file, name });
 }
 
 export async function src(cwd: string, patterns: string | string[], opts: IOptions = {}): Promise<File[]> {
   const paths = await globby(patterns, { ...opts, cwd });
   return Promise.all(
     paths.map(path =>
-      readFile(resolve(cwd, path)).then(buffer => new File(path, buffer))
+      readFile(resolve(cwd, path)).then(buffer => mkFile(path, buffer))
     )
   );
 }
 
-export function dest(path: string): (files: File[]) => Promise<any> {
-  return async (files) => Promise.all(files.map(
-    file => writeFile(resolve(path, file.path), file.buffer)
-  ));
+export function dest(path: string): (files: File[]) => Promise<void> {
+  return async (files) => {
+    await Promise.all(files.map(
+      file => writeFile(resolve(path, file.path), file.buffer)
+    ));
+  };
 }
 
 /**
