@@ -1,5 +1,7 @@
-import { task, series, parallel, Task } from "../src/index";
+import { task, run, series, parallel, src, dest, Task, RunnableTask } from "../src/index";
 import { assert } from "chai";
+import { dir } from "tmp";
+import * as fs from "fs";
 
 /**
  * 
@@ -7,7 +9,7 @@ import { assert } from "chai";
  * @param seriesCount 
  * @param taskBuilder 
  */
-async function assertTaskConcurrency(count: number, seriesCount: number, taskBuilder: (fn: any) => Task) {
+async function assertTaskConcurrency(count: number, seriesCount: number, taskBuilder: (fn: any) => RunnableTask) {
   let delayTime = 100;
 
   let counter = 0;
@@ -17,13 +19,16 @@ async function assertTaskConcurrency(count: number, seriesCount: number, taskBui
     return new Promise((resolve, reject) => setTimeout(resolve, delayTime));
   });
 
-  await task();
+  await run(task);
 
   const timeTaken = new Date().getTime() - startTime; 
   assert.approximately(timeTaken, seriesCount * delayTime, delayTime / 2);
 
   assert.equal(counter, count);
 }
+
+const tmpDir = () => new Promise<string>((resolve, reject) => dir((err, path) => (err ? reject(err) : resolve(path))));
+const readDir = (path: string) => new Promise<string[]>((resolve, reject) => fs.readdir(path, (err, files) => (err) ? reject(err) : resolve(files)));
 
 describe("Concurrency combinator", () => {
   describe("series", () => {
@@ -62,7 +67,70 @@ describe("Concurrency combinator", () => {
 });
 
 describe("Task runner", () => {
-  it("should register task names", () => {
+  it("should not run unregistered task names", async () => {
+    try {
+      await run("this-task-doesnt-exist");
+      assert.fail("Managed to run a task that doesn't exist");
+    } catch (e) {}
+  });
 
+  it("should run registered task names", async () => {
+    task("task1", async () => {});
+    try {
+      await run("task1");
+    } catch (e) {
+      assert.fail(null, null, "Couldn't run a registered task");
+    }
+  });
+
+  it("should be able to use concurrency combinators with names or tasks 1", async () => {
+    try {
+      await run(series([ "task2" ]));
+      assert.fail(null, null, "Managed to run a task that doesn't exist");
+    } catch (e) {}
+  });
+
+  it("should be able to use concurrency combinators with names or tasks 2", async () => {
+    let counter = 0;
+    task("task3", async () => counter++);
+    try {
+      await run(series([ "task3", async () => counter++, parallel([ "task3" ]) ]));
+    } catch (e) {
+      assert.fail(null, null, "Couldn't run a registered task");
+    }
+
+    assert.equal(3, counter);
   });
 })
+
+describe("File functions", () => {
+  it("should copy files from src to dest", async () => {
+    const outDir = await tmpDir();
+
+    task("copy", async () => src("tests/assets", "*").then(dest(outDir)));
+    await run("copy");
+
+    const files = await readDir(outDir);
+    assert.lengthOf(files, 4, `There should have been 4 files copied.`);
+  });
+
+  it("should copy files of a type from src to dest", async () => {
+    const outDir = await tmpDir();
+
+    task("copy", async () => src("tests/assets", "*.jpg").then(dest(outDir)));
+    await run("copy");
+
+    const files = await readDir(outDir);
+    assert.lengthOf(files, 1, `There should have been 1 file copied.`);
+  });
+
+  it("should allow an array of globs", async () => {
+    const outDir = await tmpDir();
+
+    task("copy", async () => src("tests/assets", [ "1.svg", "4.mp3" ], { root: "tests/assets" }).then(dest(outDir)));
+    await run("copy");
+
+    const files = await readDir(outDir);
+    assert.lengthOf(files, 2, `There should have been 2 files copied.`);
+  });
+});

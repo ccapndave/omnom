@@ -1,23 +1,30 @@
-const registeredTasks: Map<String, Task> = new Map();
+const registeredTasks: Map<String, RunnableTask> = new Map();
 
-export type Task
-  = (() => Promise<any>)
-  //| string;
+export type RunnableTask = (() => Promise<any>);
 
-export function task(name: string, task: Task) {
-  registeredTasks.set(name, task);
+export type Task = RunnableTask | string;
+
+export function task(name: string, runnableTask: RunnableTask): void {
+  registeredTasks.set(name, runnableTask);
 }
 
-export function series(tasks: Task[]): Task {
-  return () => tasks.reduce((acc, task) => acc.then(task), Promise.resolve())
+export function run(task: Task): Promise<any> {
+  const runnableTask = taskToRunnableTask(task);
+  return exec(runnableTask);
 }
 
-export function parallel(tasks: Task[]): Task {
-  return () => Promise.all(tasks.map(task => task())).then(_ => null);
+export function exec(runnableTask: RunnableTask): Promise<any> {
+  return runnableTask();
 }
 
-function exec(name: string) {
-  if (registeredTasks.has(name)) {
-    registeredTasks.get(name)();
+export function taskToRunnableTask(task: Task): RunnableTask {
+  if (typeof task === "string") {
+    if (registeredTasks.has(task)) {
+      return <RunnableTask>registeredTasks.get(task);
+    } else {
+      throw new Error(`Unable to find a task named "${<string>task}".`);
+    }
+  } else {
+    return task;
   }
 }
