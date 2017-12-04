@@ -6,5 +6,8 @@
   "include": [
     "src",
     "tests"
+  ],
+  "files": [
+    "node_modules/immutable/dist/immutable.d.ts"
   ]
 }

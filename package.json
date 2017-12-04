@@ -18,13 +18,14 @@
     "typescript": "^2.6.2"
   },
   "dependencies": {
-    "@types/chai": "^4.0.6",
+    "@types/chai": "^4.0.7",
     "@types/glob": "^5.0.33",
     "@types/globby": "^6.1.0",
     "@types/minimatch": "^3.0.1",
     "@types/mocha": "^2.2.44",
     "@types/tmp": "0.0.33",
     "globby": "^7.1.1",
+    "immutable": "^4.0.0-rc.9",
     "minimatch": "^3.0.4"
   }
 }

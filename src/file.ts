@@ -3,13 +3,30 @@ import * as globby from "globby"
 import * as minimatch from "minimatch"
 import * as fs from "fs"
 import { resolve, normalize, relative, dirname, basename } from "path"
-import { Minimatch } from "minimatch";
+import * as I from "immutable"
 
 class State {
+
   constructor(
     readonly cwd: string,
-    readonly files: File[]
+    readonly files: I.Map<string, File> = I.Map()
   ) {}
+
+  addFiles(files: File[]): State {
+    const updatedFiles = files.reduce((map, file) => map.set(file.path, file), this.files);
+    return new State(this.cwd, updatedFiles);
+  }
+  
+  setFiles(files: File[]): State {
+    const updatedFiles = files.reduce((map, file) => map.set(file.path, file), I.Map<string, File>());
+    return new State(this.cwd, updatedFiles);
+  }
+
+  filterFiles(predicate: (file: File) => boolean): State {
+    const updatedFiles = this.files.filter(predicate);
+    return new State(this.cwd, updatedFiles);
+  }
+  
 }
 
 class File {
@@ -22,7 +39,7 @@ class File {
 type StateTransfomer = (files: State) => Promise<State>;
 
 export async function startIn(cwd: string): Promise<State> {
-  return new State(cwd, []);
+  return new State(cwd);
 }
 
 export function addFiles(pattern: string | string[], opts: IOptions = {}): StateTransfomer {
@@ -34,21 +51,16 @@ export function addFiles(pattern: string | string[], opts: IOptions = {}): State
       )
     );
 
-    return <State>{ ...state, files };
+    return state.addFiles(files);
   }
 }
 
 export function filterFiles(pattern: string | string[], opts: IOptions = {}): StateTransfomer {
   return async state => {
     const patterns = (typeof pattern === "string") ? [ pattern ] : pattern;
+    const predicate = (file: File) => patterns.reduce((acc, pattern) => minimatch(file.path, pattern, opts) || acc, false);
 
-    let files: File[] = [];
-    for (let pattern of patterns) {
-      const matchedFiles = state.files.filter((file, indexed, array) => minimatch.filter(pattern, opts)(file.path, indexed, array.map(file => file.path)));
-      files = files.concat(matchedFiles);
-    }
-
-    return <State>{ ...state, files };
+    return state.filterFiles(predicate);
   }
 }
 
@@ -182,6 +194,7 @@ const a =
 // Giving files some kind of comparable hash would be pretty awesome.  What would it be based on?  It can't be the content or the name since both can change.
 // However, if the content or name has changed are they a different file?  No, not really.  I can assign them a uuid when they are added, and then track that in
 // a merge.  That doesn't help if we try and add the same file twice.  However, in this case we can overwrite ones with the same name, and if they have been renamed
-// then they shouldn't be overwritten anyway.
+// then they shouldn't be overwritten anyway.  So why don't I just use the name?  Might as well, so long
+// as its absolute.
 
 // So, files would become a map of cuid to file instead of just a list
