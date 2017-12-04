@@ -3,14 +3,69 @@ import * as globby from "globby"
 import * as fs from "fs"
 import { resolve, normalize, relative, dirname, basename } from "path"
 
+interface State {
+  cwd: string;
+  files: File[];
+}
+
 interface File {
   readonly path: string;
   readonly buffer: Buffer;
 }
 
+function mkState(cwd: string, files: File[]): State {
+  return { cwd, files };
+}
+
 function mkFile(path: string, buffer: Buffer): File {
   return { path: normalize(path), buffer };
 }
+
+type StateTransfomer = (files: State) => Promise<State>;
+
+export async function startIn(cwd: string): Promise<State> {
+  return mkState(cwd, []);
+}
+
+export function globFiles(patterns: string | string[], opts: IOptions = {}): StateTransfomer {
+  return async state => {
+    const paths = await globby(patterns, { ...opts });
+    const files = await Promise.all(
+      paths.map(path =>
+        readFile(resolve(state.cwd, path)).then(buffer => mkFile(path, buffer))
+      )
+    );
+
+    return { ...state, files };
+  }
+}
+
+export function writeTo(path: string): StateTransfomer {
+  return async state => {
+    await Promise.all(state.files.map(
+      file => writeFile(resolve(path, file.path), file.buffer)
+    ));
+
+    return state;
+  };
+}
+
+export function update(...stateTransformers: StateTransfomer[]): StateTransfomer {
+  return async state => {
+    // Apply the transformers to the state
+    let stateToMerge = state;
+    for (let stateTransfomer of stateTransformers) {
+      stateToMerge = await stateTransfomer(stateToMerge);
+    }
+
+    // Merge the stateToMerge into the original state
+    
+
+    return state;
+  } 
+}
+
+
 
 export function rename(path: string): (file: File) => File {
   return file => ({ ...file, path });
@@ -82,14 +137,22 @@ function mapJson(transformer: (json: any) => any): FileTransfomer {
 
 const update = (...steps: FileTransfomer[]) => (files: File[]) => Promise.resolve(files);
 
- // The then version
 const a =
-  fromDir("test/assets")
+  startIn("test/assets")
     .then(globFiles("*"))
     .then(update(
       globFiles("*.json"),
       mapJson(json => json.version++)
     ))
     .then(writeTo("out"));
+
+const a =
+  startIn("test/assets")
+    .globFiles("*")
+    .update(
+      globFiles("*.json"),
+      mapJson(json => json.version++)
+    )
+    .writeTo("out");
  */
- */
+ 
