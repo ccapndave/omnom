@@ -1,42 +1,54 @@
 import { IOptions } from "glob"
 import * as globby from "globby"
+import * as minimatch from "minimatch"
 import * as fs from "fs"
 import { resolve, normalize, relative, dirname, basename } from "path"
+import { Minimatch } from "minimatch";
 
-interface State {
-  cwd: string;
-  files: File[];
+class State {
+  constructor(
+    readonly cwd: string,
+    readonly files: File[]
+  ) {}
 }
 
-interface File {
-  readonly path: string;
-  readonly buffer: Buffer;
-}
-
-function mkState(cwd: string, files: File[]): State {
-  return { cwd, files };
-}
-
-function mkFile(path: string, buffer: Buffer): File {
-  return { path: normalize(path), buffer };
+class File {
+  constructor(
+    readonly path: string,
+    readonly buffer: Buffer
+  ) {}
 }
 
 type StateTransfomer = (files: State) => Promise<State>;
 
 export async function startIn(cwd: string): Promise<State> {
-  return mkState(cwd, []);
+  return new State(cwd, []);
 }
 
-export function globFiles(patterns: string | string[], opts: IOptions = {}): StateTransfomer {
+export function addFiles(pattern: string | string[], opts: IOptions = {}): StateTransfomer {
   return async state => {
-    const paths = await globby(patterns, { ...opts });
+    const paths = await globby(pattern, { ...opts, cwd: state.cwd });
     const files = await Promise.all(
       paths.map(path =>
-        readFile(resolve(state.cwd, path)).then(buffer => mkFile(path, buffer))
+        readFile(resolve(state.cwd, path)).then(buffer => new File(path, buffer))
       )
     );
 
-    return { ...state, files };
+    return <State>{ ...state, files };
+  }
+}
+
+export function filterFiles(pattern: string | string[], opts: IOptions = {}): StateTransfomer {
+  return async state => {
+    const patterns = (typeof pattern === "string") ? [ pattern ] : pattern;
+
+    let files: File[] = [];
+    for (let pattern of patterns) {
+      const matchedFiles = state.files.filter((file, indexed, array) => minimatch.filter(pattern, opts)(file.path, indexed, array.map(file => file.path)));
+      files = files.concat(matchedFiles);
+    }
+
+    return <State>{ ...state, files };
   }
 }
 
@@ -59,7 +71,6 @@ export function update(...stateTransformers: StateTransfomer[]): StateTransfomer
     }
 
     // Merge the stateToMerge into the original state
-    
 
     return state;
   } 
@@ -85,7 +96,7 @@ export async function src(cwd: string, patterns: string | string[], opts: IOptio
   const paths = await globby(patterns, { ...opts, cwd });
   return Promise.all(
     paths.map(path =>
-      readFile(resolve(cwd, path)).then(buffer => mkFile(path, buffer))
+      readFile(resolve(cwd, path)).then(buffer => new File(path, buffer))
     )
   );
 }
@@ -148,9 +159,9 @@ const a =
 
 const a =
   startIn("test/assets")
-    .globFiles("*")
+    .addFiles("*")
     .update(
-      globFiles("*.json"),
+      filterFiles("*.json"),
       mapJson(json => json.version++)
     )
     .writeTo("out");

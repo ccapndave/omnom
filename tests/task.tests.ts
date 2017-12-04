@@ -1,4 +1,4 @@
-import { task, run, series, parallel, src, rename, mapJson, dest, Task, RunnableTask } from "../src/index";
+import { task, run, series, parallel, startIn, addFiles, filterFiles, writeTo, update, Task, RunnableTask } from "../src/index";
 import { assert } from "chai";
 import { dir } from "tmp";
 import { resolve } from "path";
@@ -109,7 +109,11 @@ describe("File functions", () => {
   it("should copy files from src to dest", async () => {
     const outDir = await tmpDir();
 
-    task("copy", async () => src("tests/assets", "*").then(dest(outDir)));
+    task("copy", async () =>
+      startIn("tests/assets")
+        .then(addFiles("*"))
+        .then(writeTo(outDir))
+    );
     await run("copy");
 
     const files = await readDir(outDir);
@@ -119,7 +123,11 @@ describe("File functions", () => {
   it("should copy files of a type from src to dest", async () => {
     const outDir = await tmpDir();
 
-    task("copy", async () => src("tests/assets", "*.jpg").then(dest(outDir)));
+    task("copy", async () =>
+      startIn("tests/assets")
+        .then(addFiles("*.svg"))
+        .then(writeTo(outDir))
+    );
     await run("copy");
 
     const files = await readDir(outDir);
@@ -129,13 +137,33 @@ describe("File functions", () => {
   it("should allow an array of globs", async () => {
     const outDir = await tmpDir();
 
-    task("copy", async () => src("tests/assets", [ "1.svg", "4.mp3" ]).then(dest(outDir)));
+    task("copy", async () =>
+      startIn("tests/assets")
+        .then(addFiles([ "*.svg", "*.mp3" ]))
+        .then(writeTo(outDir))
+    );
     await run("copy");
 
     const files = await readDir(outDir);
     assert.lengthOf(files, 2, `There should have been 2 files copied.`);
   });
 
+  it("should filter files", async () => {
+    const outDir = await tmpDir();
+
+    task("copy", async () =>
+      startIn("tests/assets")
+        .then(addFiles("*"))
+        .then(filterFiles("*.jpg"))
+        .then(writeTo(outDir))
+    );
+    await run("copy");
+
+    const files = await readDir(outDir);
+    assert.lengthOf(files, 1, `There should have been 1 file copied.`);
+  });
+
+/*
   it("should allow file renaming", async () => {
     const outDir = await tmpDir();
 
@@ -172,6 +200,6 @@ describe("File functions", () => {
     const loadedJson = await readFile(resolve(outDir, "5.json"));
     const parsedJson = JSON.parse(loadedJson.toString());
     assert.equal(parsedJson.changed, true);
-  });
+  });*/
 
 });
