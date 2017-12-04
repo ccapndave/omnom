@@ -62,6 +62,7 @@ export function writeTo(path: string): StateTransfomer {
   };
 }
 
+// I'm not 100% sure about this function.
 export function update(...stateTransformers: StateTransfomer[]): StateTransfomer {
   return async state => {
     // Apply the transformers to the state
@@ -166,4 +167,21 @@ const a =
     )
     .writeTo("out");
  */
- 
+
+ /*
+const a =
+  startIn("test/assets")
+  .then(addFiles("*"))
+  .then(merge(
+    filterFiles("1.svg"),
+    rename(originalName => "renamed.svg")
+  )) // here you would have both, but that's ok... not really
+  .then(writeTo("out");
+*/
+
+// Giving files some kind of comparable hash would be pretty awesome.  What would it be based on?  It can't be the content or the name since both can change.
+// However, if the content or name has changed are they a different file?  No, not really.  I can assign them a uuid when they are added, and then track that in
+// a merge.  That doesn't help if we try and add the same file twice.  However, in this case we can overwrite ones with the same name, and if they have been renamed
+// then they shouldn't be overwritten anyway.
+
+// So, files would become a map of cuid to file instead of just a list
