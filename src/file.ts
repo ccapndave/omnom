@@ -60,3 +60,36 @@ function writeFile(path: string, data: Buffer): Promise<void> {
     (resolve, reject) => fs.writeFile(path, data, (err) => (err) ? reject(err) : resolve())
   );
 }
+
+/**
+
+/* interface File {}
+
+type FileTransfomer = (files: File[]) => Promise<File[]>;
+
+const fromDir = (dir: string): Promise<File[]> => Promise.resolve([]);
+
+function globFiles(pattern: string): FileTransfomer {
+  return files => Promise.resolve(files);
+}
+
+function writeTo(path: string): FileTransfomer {
+  return files => Promise.resolve(files);
+
+function mapJson(transformer: (json: any) => any): FileTransfomer {
+  return files => Promise.resolve(files);
+}
+
+const update = (...steps: FileTransfomer[]) => (files: File[]) => Promise.resolve(files);
+
+ // The then version
+const a =
+  fromDir("test/assets")
+    .then(globFiles("*"))
+    .then(update(
+      globFiles("*.json"),
+      mapJson(json => json.version++)
+    ))
+    .then(writeTo("out"));
+ */
+ */
