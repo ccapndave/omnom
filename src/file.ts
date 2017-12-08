@@ -1,15 +1,21 @@
 import { IOptions } from "glob"
 import * as globby from "globby"
 import * as minimatch from "minimatch"
-import * as fs from "fs"
+import * as fs from "fs-extra"
 import { resolve, normalize, relative, dirname, basename } from "path"
 import * as I from "immutable"
 
-class State {
+export class File {
+  constructor(
+    readonly path: string,
+    readonly buffer: Buffer
+  ) {}
+}
 
+export class State {
   constructor(
     readonly cwd: string,
-    readonly files: I.Map<string, File> = I.Map()
+    readonly files: I.Map<string, File> = I.Map() // TODO: I think this could be a Files class with add, set, filter
   ) {}
 
   addFiles(files: File[]): State {
@@ -26,17 +32,9 @@ class State {
     const updatedFiles = this.files.filter(predicate);
     return new State(this.cwd, updatedFiles);
   }
-  
 }
 
-class File {
-  constructor(
-    readonly path: string,
-    readonly buffer: Buffer
-  ) {}
-}
-
-type StateTransfomer = (files: State) => Promise<State>;
+export type StateTransfomer = (files: State) => Promise<State>;
 
 export async function startIn(cwd: string): Promise<State> {
   return new State(cwd);
@@ -47,7 +45,7 @@ export function addFiles(pattern: string | string[], opts: IOptions = {}): State
     const paths = await globby(pattern, { ...opts, cwd: state.cwd });
     const files = await Promise.all(
       paths.map(path =>
-        readFile(resolve(state.cwd, path)).then(buffer => new File(path, buffer))
+        fs.readFile(resolve(state.cwd, path)).then(buffer => new File(path, buffer))
       )
     );
 
@@ -65,13 +63,19 @@ export function filterFiles(pattern: string | string[], opts: IOptions = {}): St
 }
 
 export function writeTo(path: string): StateTransfomer {
-  return async state => {
-    await Promise.all(state.files.map(
-      file => writeFile(resolve(path, file.path), file.buffer)
-    ));
+  return async state => { 
+    // Copy all files, making sure that their paths exist
+    await Promise.all(
+      state.files.valueSeq().map(async file => {
+        const fullPath = resolve(path, file.path);
+
+        await fs.ensureDir(dirname(fullPath));
+        await fs.writeFile(fullPath, file.buffer);
+      })
+    );
 
     return state;
-  };
+  }
 }
 
 // I'm not 100% sure about this function.
@@ -89,11 +93,16 @@ export function update(...stateTransformers: StateTransfomer[]): StateTransfomer
   } 
 }
 
-
-
-export function rename(path: string): (file: File) => File {
-  return file => ({ ...file, path });
+export function rename(filenameTransformer: (originalFilename: string) => string): StateTransfomer {
+  return async state => {
+    const files = state.files.map(file => ({ ...file, path: filenameTransformer(file.path) })).valueSeq().toArray();
+    return state.setFiles(files);
+  }
 }
+
+/* export function rename(path: string): (file: File) => File {
+  return file => ({ ...file, path });
+} */
 
 export function mapJson(transform: (json: any) => any): (file: File) => File {
   return file => {
@@ -103,41 +112,6 @@ export function mapJson(transform: (json: any) => any): (file: File) => File {
 
     return ({ ...file, buffer });
   }
-}
-
-export async function src(cwd: string, patterns: string | string[], opts: IOptions = {}): Promise<File[]> {
-  const paths = await globby(patterns, { ...opts, cwd });
-  return Promise.all(
-    paths.map(path =>
-      readFile(resolve(cwd, path)).then(buffer => new File(path, buffer))
-    )
-  );
-}
-
-export function dest(path: string): (files: File[]) => Promise<void> {
-  return async (files) => {
-    await Promise.all(files.map(
-      file => writeFile(resolve(path, file.path), file.buffer)
-    ));
-  };
-}
-
-/**
- * Promisified version of fs.readFile
- */
-function readFile(path: string): Promise<Buffer> {
-  return new Promise<Buffer>(
-    (resolve, reject) => fs.readFile(path, (err, data) => (err) ? reject(err) : resolve(data))
-  );
-}
-
-/**
- * Promisified version of fs.writeFile
- */
-function writeFile(path: string, data: Buffer): Promise<void> {
-  return new Promise(
-    (resolve, reject) => fs.writeFile(path, data, (err) => (err) ? reject(err) : resolve())
-  );
 }
 
 /**

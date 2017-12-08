@@ -2,7 +2,7 @@ import { task, run, series, parallel, startIn, addFiles, filterFiles, writeTo, u
 import { assert } from "chai";
 import { dir } from "tmp";
 import { resolve } from "path";
-import * as fs from "fs";
+import * as fs from "fs-extra";
 
 /**
  * 
@@ -29,8 +29,6 @@ async function assertTaskConcurrency(count: number, seriesCount: number, taskBui
 }
 
 const tmpDir = () => new Promise<string>((resolve, reject) => dir((err, path) => (err ? reject(err) : resolve(path))));
-const readDir = (path: string) => new Promise<string[]>((resolve, reject) => fs.readdir(path, (err, files) => (err) ? reject(err) : resolve(files)));
-const readFile = (path: string) => new Promise<string | Buffer>((resolve, reject) => fs.readFile(path, (err, data) => (err) ? reject(err) : resolve(data)));
 
 describe("Concurrency combinator", () => {
   describe("series", () => {
@@ -109,57 +107,53 @@ describe("File functions", () => {
   it("should copy files from src to dest", async () => {
     const outDir = await tmpDir();
 
-    task("copy", async () =>
+    await run(() =>
       startIn("tests/assets")
         .then(addFiles("*"))
         .then(writeTo(outDir))
     );
-    await run("copy");
 
-    const files = await readDir(outDir);
+    const files = await fs.readdirSync(outDir);
     assert.lengthOf(files, 5, `There should have been 5 files copied.`);
   });
 
   it("should copy files of a type from src to dest", async () => {
     const outDir = await tmpDir();
 
-    task("copy", async () =>
+    await run(() =>
       startIn("tests/assets")
         .then(addFiles("*.svg"))
         .then(writeTo(outDir))
     );
-    await run("copy");
 
-    const files = await readDir(outDir);
+    const files = await fs.readdir(outDir);
     assert.lengthOf(files, 1, `There should have been 1 file copied.`);
   });
 
   it("should allow an array of globs", async () => {
     const outDir = await tmpDir();
 
-    task("copy", async () =>
+    await run(() =>
       startIn("tests/assets")
         .then(addFiles([ "*.svg", "*.mp3" ]))
         .then(writeTo(outDir))
     );
-    await run("copy");
 
-    const files = await readDir(outDir);
+    const files = await fs.readdir(outDir);
     assert.lengthOf(files, 2, `There should have been 2 files copied.`);
   });
 
   it("should filter files", async () => {
     const outDir = await tmpDir();
 
-    task("copy", async () =>
+    await run(() =>
       startIn("tests/assets")
         .then(addFiles("*"))
         .then(filterFiles("*.jpg"))
         .then(writeTo(outDir))
     );
-    await run("copy");
 
-    const files = await readDir(outDir);
+    const files = await fs.readdir(outDir);
     assert.lengthOf(files, 1, `There should have been 1 file copied.`);
   });
 

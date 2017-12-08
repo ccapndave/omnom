@@ -8,9 +8,9 @@ export function task(name: string, runnableTask: RunnableTask): void {
   registeredTasks.set(name, runnableTask);
 }
 
-export function run(task: Task): Promise<any> {
+export async function run(task: Task): Promise<any> {
   const runnableTask = taskToRunnableTask(task);
-  return exec(runnableTask);
+  return await exec(runnableTask);
 }
 
 export function exec(runnableTask: RunnableTask): Promise<any> {

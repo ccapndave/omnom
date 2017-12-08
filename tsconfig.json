@@ -1,11 +1,18 @@
 {
   "compilerOptions": {
     "target": "es6",
-    "strict": true
+    "moduleResolution": "node",
+    "module": "commonjs",
+    "noImplicitAny": true,
+    "removeComments": true,
+    "preserveConstEnums": true,
+    "outDir": "dist/"
   },
   "include": [
-    "src",
-    "tests"
+    "src"
+  ],
+  "exclude": [
+    "test"
   ],
   "files": [
     "node_modules/immutable/dist/immutable.d.ts"
