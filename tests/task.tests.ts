@@ -1,8 +1,9 @@
-import { task, run, series, parallel, startIn, addFiles, filterFiles, writeTo, update, Task, RunnableTask } from "../src/index";
+import { task, run, series, parallel, startIn, addFiles, filterFiles, writeTo, rename, Task, RunnableTask } from "../src/index";
 import { assert } from "chai";
 import { dir } from "tmp";
 import { resolve } from "path";
 import * as fs from "fs-extra";
+import { forEachFile } from "../src/files";
 
 /**
  * 
@@ -157,24 +158,23 @@ describe("File functions", () => {
     assert.lengthOf(files, 1, `There should have been 1 file copied.`);
   });
 
-/*
   it("should allow file renaming", async () => {
     const outDir = await tmpDir();
 
-    task("rename", async () =>
-      src("tests/assets", "1.svg")
-        .then(files => files.map(rename("renamed.svg")))
-        .then(dest(outDir))
+    await run(() =>
+      startIn("tests/assets")
+        .then(addFiles("1.svg"))
+        .then(forEachFile(rename(_ => "renamed.svg")))
+        .then(writeTo(outDir))
     );
 
-    await run("rename");
-
-    const files = await readDir(outDir);
+    const files = await fs.readdir(outDir);
 
     assert.lengthOf(files, 1);
     assert.equal(files[0], "renamed.svg");
   });
 
+/*
   it("should manipulate json", async () => {
     const outDir = await tmpDir();
 
