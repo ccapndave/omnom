@@ -1,6 +1,6 @@
 {
   "name": "om-nom",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A functional, minimalist, promise based task runner library for nodejs",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
