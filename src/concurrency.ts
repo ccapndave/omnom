@@ -1,11 +1,9 @@
-import { exec, taskToRunnableTask, Task, RunnableTask } from "./task"
+import { run, Task } from "./task"
 
-export function series(tasks: Task[]): RunnableTask {
-  const runnableTasks = tasks.map(taskToRunnableTask);
-  return () => runnableTasks.reduce((acc, runnableTask) => acc.then(exec.bind(null, runnableTask)), Promise.resolve())
+export function series(tasks: Task[]): Task {
+  return () => tasks.reduce((acc, task) => acc.then(run.bind(null, task)), Promise.resolve())
 }
 
-export function parallel(tasks: Task[]): RunnableTask {
-  const runnableTasks = tasks.map(taskToRunnableTask);
-  return () => Promise.all(runnableTasks.map(runnableTask => exec(runnableTask).then(_ => null)));
+export function parallel(tasks: Task[]): Task {
+  return () => Promise.all(tasks.map(task => run(task).then(_ => null)));
 }
